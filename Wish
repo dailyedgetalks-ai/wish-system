@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Wish System</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            padding: 20px;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 30px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+        .wish-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input, textarea {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        button {
+            background: linear-gradient(to right, #4a90e2, #357abd);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        .wishes-container {
+            margin-top: 30px;
+        }
+        .wish-item {
+            background-color: #f9f9f9;
+            border-left: 4px solid #4a90e2;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 0.5s;
+        }
+        .wish-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .wish-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1rem;
+        }
+        .wish-date {
+            color: #777;
+            font-size: 0.9rem;
+        }
+        .wish-text {
+            color: #555;
+            line-height: 1.5;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #777;
+        }
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4a90e2;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            animation: fadeIn 0.5s;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #777;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(10px); }
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✨ Global Wish System ✨</h1>
+        <form class="wish-form" id="wishForm">
+            <div class="form-group">
+                <label for="name">Your Name</label>
+                <input type="text" id="name" placeholder="Enter your name" required>
+            </div>
+            <div class="form-group">
+                <label for="wish">Your Wish</label>
+                <textarea id="wish" placeholder="What do you wish for?" required></textarea>
+            </div>
+            <button type="submit">Make a Wish</button>
+        </form>
+        <div class="wishes-container" id="wishesContainer">
+            <div class="loading">Loading wishes...</div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const wishForm = document.getElementById('wishForm');
+            const wishesContainer = document.getElementById('wishesContainer');
+            
+            // GitHub repository configuration
+            const config = {
+                owner: 'YOUR_GITHUB_USERNAME', // Replace with your GitHub username
+                repo: 'YOUR_REPO_NAME',        // Replace with your repository name
+                filePath: 'wishes.json',       // File to store wishes
+                branch: 'main',                // Branch to use
+                token: 'YOUR_GITHUB_TOKEN'    // Personal Access Token with repo scope
+            };
+
+            // API URL for GitHub
+            const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.filePath}`;
+
+            // Load wishes from GitHub
+            async function loadWishes() {
+                try {
+                    wishesContainer.innerHTML = '<div class="loading">Loading wishes...</div>';
+                    
+                    const response = await fetch(`${apiUrl}?ref=${config.branch}`, {
+                        headers: {
+                            'Authorization': `token ${config.token}`
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            // File doesn't exist yet, create it
+                            await createWishesFile();
+                            return;
+                        }
+                        throw new Error(`GitHub API error: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    const content = JSON.parse(atob(data.content));
+                    
+                    displayWishes(content);
+                } catch (error) {
+                    console.error('Error loading wishes:', error);
+                    wishesContainer.innerHTML = `
+                        <div class="empty-state">
+                            <p>Unable to load wishes. Please try again later.</p>
+                            <p class="error-details">${error.message}</p>
+                        </div>
+                    `;
+                }
+            }
+
+            // Create wishes file if it doesn't exist
+            async function createWishesFile() {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${config.token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message: 'Create wishes file',
+                            content: btoa(JSON.stringify([])),
+                            branch: config.branch
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Failed to create wishes file: ${response.status}`);
+                    }
+                    
+                    displayWishes([]);
+                } catch (error) {
+                    console.error('Error creating wishes file:', error);
+                    wishesContainer.innerHTML = `
+                        <div class="empty-state">
+                            <p>Unable to initialize wish system. Please try again later.</p>
+                        </div>
+                    `;
+                }
+            }
+
+            // Display wishes
+            function displayWishes(wishes) {
+                wishesContainer.innerHTML = '';
+                
+                if (wishes.length === 0) {
+                    wishesContainer.innerHTML = `
+                        <div class="empty-state">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                            <p>No wishes yet. Be the first to make a wish!</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Sort wishes by date (newest first)
+                wishes.sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                wishes.forEach(wish => {
+                    const wishElement = document.createElement('div');
+                    wishElement.className = 'wish-item';
+                    const formattedDate = new Date(wish.date).toLocaleString();
+                    
+                    wishElement.innerHTML = `
+                        <div class="wish-header">
+                            <div class="wish-name">${escapeHtml(wish.name)}</div>
+                            <div class="wish-date">${formattedDate}</div>
+                        </div>
+                        <div class="wish-text">${escapeHtml(wish.wish)}</div>
+                    `;
+                    
+                    wishesContainer.appendChild(wishElement);
+                });
+            }
+
+            // Save a new wish to GitHub
+            async function saveWish(name, wishText) {
+                try {
+                    // Get current wishes
+                    const response = await fetch(`${apiUrl}?ref=${config.branch}`, {
+                        headers: {
+                            'Authorization': `token ${config.token}`
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`GitHub API error: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    const wishes = JSON.parse(atob(data.content));
+                    
+                    // Add new wish
+                    wishes.push({
+                        name: name,
+                        wish: wishText,
+                        date: new Date().toISOString()
+                    });
+                    
+                    // Update file
+                    const updateResponse = await fetch(apiUrl, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${config.token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message: 'Add new wish',
+                            content: btoa(JSON.stringify(wishes)),
+                            sha: data.sha,
+                            branch: config.branch
+                        })
+                    });
+                    
+                    if (!updateResponse.ok) {
+                        throw new Error(`Failed to update wishes: ${updateResponse.status}`);
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error saving wish:', error);
+                    return false;
+                }
+            }
+
+            // Handle form submission
+            wishForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const name = document.getElementById('name').value.trim();
+                const wishText = document.getElementById('wish').value.trim();
+                
+                if (name && wishText) {
+                    // Disable form during submission
+                    const submitButton = wishForm.querySelector('button[type="submit"]');
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Submitting...';
+                    
+                    const success = await saveWish(name, wishText);
+                    
+                    // Re-enable form
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Make a Wish';
+                    
+                    if (success) {
+                        // Reset form
+                        wishForm.reset();
+                        
+                        // Reload wishes
+                        loadWishes();
+                        
+                        // Show success notification
+                        showNotification('Your wish has been added!');
+                    } else {
+                        showNotification('Error adding wish. Please try again.');
+                    }
+                }
+            });
+
+            // Helper function to escape HTML
+            function escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, m => map[m]);
+            }
+
+            // Show notification
+            function showNotification(message) {
+                const notification = document.createElement('div');
+                notification.className = 'notification';
+                notification.textContent = message;
+                
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.style.animation = 'fadeOut 0.5s';
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 500);
+                }, 3000);
+            }
+
+            // Initial load
+            loadWishes();
+        });
+    </script>
+</body>
+</html>
